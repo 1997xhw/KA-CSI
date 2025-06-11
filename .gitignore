@@ -1,1 +1,24 @@
 /data/
+
+# JetBrains IDE (PyCharm, etc.)
+.idea/
+
+# Python bytecode cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+
+# Training runs (假设是 TensorBoard/PyTorch 的日志)
+runs/
+
+# Test-related files (如果 test/ 目录包含临时测试数据)
+test/
+
+# macOS/Windows 的隐藏文件
+.DS_Store
+Thumbs.db
+
+# Python virtual environment (通常也不该提交)
+venv/
+env/
