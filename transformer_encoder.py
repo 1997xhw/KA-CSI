@@ -158,12 +158,51 @@ class MultiHeadedAttention(nn.Module):
         return self.linears[-1](x)
 
 
+class RelativeMultiHeadAttention(nn.Module):
+    def __init__(self, h, d_model, max_len=5000, dropout=0.1):
+        super().__init__()
+        assert d_model % h == 0
+        self.d_k = d_model // h
+        self.h = h
+        self.linears = nn.ModuleList([nn.Linear(d_model, d_model) for _ in range(4)])
+        self.dropout = nn.Dropout(dropout)
+        self.max_len = max_len
+        # 相对位置嵌入
+        self.rel_pos_emb = nn.Parameter(torch.randn(max_len * 2 - 1, self.d_k))
+
+    def forward(self, query, key, value, mask=None):
+        nbatches = query.size(0)
+        seq_len = query.size(1)
+        query, key, value = [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2)
+                             for l, x in zip(self.linears, (query, key, value))]
+        # 计算相对位置索引
+        range_vec = torch.arange(seq_len, device=query.device)
+        rel_pos = range_vec[None, :] - range_vec[:, None] + seq_len - 1  # shape: [seq_len, seq_len]
+        rel_emb = self.rel_pos_emb[rel_pos]  # [seq_len, seq_len, d_k]
+        # 计算注意力分数
+        scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(self.d_k)
+        # 加入相对位置项
+        # query: [B, h, T, d_k], rel_emb: [T, T, d_k]
+        scores = scores + torch.einsum('bhid,jkd->bhij', query, rel_emb)
+        if mask is not None:
+            scores = scores.masked_fill(mask == 0, -1e9)
+        p_attn = F.softmax(scores, dim=-1)
+        p_attn = self.dropout(p_attn)
+        x = torch.matmul(p_attn, value)
+        x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
+        return self.linears[-1](x)
+
+
 class Transformer(nn.Module):
-    def __init__(self, hidden_dim, N, H):
+    def __init__(self, hidden_dim, N, H, use_relative=False, max_len=5000):
         super(Transformer, self).__init__()
         # self. pos_encoding = PositionalEncoding(hidden_dim, 0.1)
+        if use_relative:
+            attn = RelativeMultiHeadAttention(H, hidden_dim, max_len=max_len)
+        else:
+            attn = MultiHeadedAttention(H, hidden_dim)
         self.model = Encoder(
-            EncoderLayer(hidden_dim, MultiHeadedAttention(H, hidden_dim),
+            EncoderLayer(hidden_dim, attn,
                          PositionwiseFeedForward(hidden_dim, hidden_dim * 4)
                          , 0.1),
             N

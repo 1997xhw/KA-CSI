@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -53,3 +52,26 @@ class Gaussian_Position(nn.Module):
         pos_enc = torch.matmul(M, self.embedding)
         #print(M)
         return x + pos_enc.unsqueeze(0).repeat(x.size(0), 1, 1)
+
+# 新增：Learnable Positional Embedding
+class LearnablePositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len):
+        super().__init__()
+        self.pe = nn.Parameter(torch.zeros(1, max_len, d_model))
+        nn.init.xavier_uniform_(self.pe)
+    def forward(self, x):
+        return x + self.pe[:, :x.size(1), :]
+
+# 新增：Sinusoidal Positional Encoding
+class SinusoidalPositionalEncoding(nn.Module):
+    def __init__(self, d_model, max_len=5000):
+        super().__init__()
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * -(math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0)  # [1, max_len, d_model]
+        self.register_buffer('pe', pe)
+    def forward(self, x):
+        return x + self.pe[:, :x.size(1), :]

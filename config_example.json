@@ -1,0 +1,27 @@
+{
+    "model": {
+        "hlayers": 5,
+        "vlayers": 1,
+        "hheads": 6,
+        "vheads": 10,
+        "K": 10,
+        "sample": 2,
+        "maxlen": 2000,
+        "embed_dim": 60,
+        "num_class": 6
+    },
+    "training": {
+        "batch_size": 4,
+        "epochs": 50,
+        "learning_rate": 1e-4
+    },
+    "data": {
+        "dataset_type": "npy",
+        "root_dir": "./data/",
+        "class_names": ["wave", "beckon", "push", "pull", "sitdown", "getdown"]
+    },
+    "experiment": {
+        "model_type": "KAN_CA_CSI",
+        "save_dir": "runs"
+    }
+} 
