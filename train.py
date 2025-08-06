@@ -363,10 +363,15 @@ def main():
             },
             'experiment': {
                 'model_type': args.model_type
-            }
+            },
+            'data': {
+                'dataset_type': 'npy', 'root_dir': './data/',
+                'class_names': ['wave', 'beckon', 'push', 'pull', 'sitdown', 'getdown']
+            },
         }
         config = ExperimentConfig(config_dict)
-    
+
+    print(config)
     experiment_manager = ExperimentManager(config)
     history, best_acc = experiment_manager.run_experiment()
     
