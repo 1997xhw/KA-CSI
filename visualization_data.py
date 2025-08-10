@@ -86,7 +86,7 @@ def draw_confusion_matrix_2(y_true, y_pred):
     plt.show()
 
 
-def draw_confusion_matrix_3(y_true, y_pred, class_names=None):
+def draw_confusion_matrix_3(y_true, y_pred, class_names=None, save_path=None):
     import matplotlib.pyplot as plt
     import seaborn as sns
 
@@ -105,10 +105,16 @@ def draw_confusion_matrix_3(y_true, y_pred, class_names=None):
     plt.title('Confusion Matrix')
     plt.xticks(rotation=45)
     plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"混淆矩阵已保存到: {save_path}")
+    
     plt.show()
+    plt.close()
 
 
-def draw_metrics_curves(epochs, train_acc, val_acc, precision, recall, f1):
+def draw_metrics_curves(epochs, train_acc, val_acc, precision, recall, f1, save_path=None):
     import matplotlib.pyplot as plt
     x = list(range(1, epochs + 1))
 
@@ -148,7 +154,13 @@ def draw_metrics_curves(epochs, train_acc, val_acc, precision, recall, f1):
     plt.legend()
 
     plt.tight_layout()
+    
+    if save_path:
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        print(f"指标曲线已保存到: {save_path}")
+    
     plt.show()
+    plt.close()
 
 
 def visualize_from_csv(csv_file_path, output_dir=None, class_names=None, save_plots=True, show_plots=True):

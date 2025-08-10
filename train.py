@@ -4,6 +4,10 @@ import os
 import json
 from pathlib import Path
 
+# 设置matplotlib后端，避免Qt问题
+import matplotlib
+matplotlib.use('Agg')  # 使用非交互式后端
+
 from models import TwoStreamModel
 from grn import GatesResidualNetwork
 from visualization_data import draw_confusion_matrix_3, draw_metrics_curves
@@ -94,10 +98,11 @@ class ModelFactory:
 class Trainer:
     """训练器类"""
     
-    def __init__(self, model, config, device):
+    def __init__(self, model, config, device, run_dir=None):
         self.model = model
         self.config = config
         self.device = device
+        self.run_dir = run_dir
         self.train_config = config.get_training_config()
         
         self.criterion = nn.CrossEntropyLoss()
@@ -201,10 +206,13 @@ class Trainer:
                 self.best_val_acc = val_acc
                 print(f"新的最佳验证准确率: {val_acc:.4f}")
             
-            if epoch == epochs - 1 and class_names:
-                draw_confusion_matrix_3(all_labels, all_preds, class_names)
+            if epoch == epochs - 1 and class_names and self.run_dir:
+                # 保存混淆矩阵
+                draw_confusion_matrix_3(all_labels, all_preds, class_names, save_path=str(self.run_dir / 'confusion_matrix.png'))
+                # 保存指标曲线
                 draw_metrics_curves(epochs, self.history['train_acc'], self.history['val_acc'],
-                                  self.history['precision'], self.history['recall'], self.history['f1'])
+                                  self.history['precision'], self.history['recall'], self.history['f1'],
+                                  save_path=str(self.run_dir / 'metrics_curves.png'))
         
         return self.history
 
@@ -224,11 +232,23 @@ class ExperimentManager:
         config.save_config(self.run_dir / 'config.json')
     
     def setup_data(self):
-        train_loader, val_loader = get_dataloader(
+        train_loader, val_loader, class_names = get_dataloader(
             dataset_type=self.data_config['dataset_type'],
             root_dir=self.data_config['root_dir'],
             batch_size=self.config.get_training_config()['batch_size']
         )
+        
+        # 更新配置中的class_names
+        self.data_config['class_names'] = class_names
+        self.config.config['data']['class_names'] = class_names
+        
+        # 更新模型的num_class
+        num_class = len(class_names)
+        self.config.config['model']['num_class'] = num_class
+        
+        print(f"检测到动作类别: {class_names}")
+        print(f"类别数量: {num_class}")
+        
         return train_loader, val_loader
     
     def setup_model(self):
@@ -260,7 +280,7 @@ class ExperimentManager:
         train_loader, val_loader = self.setup_data()
         model = self.setup_model()
         
-        trainer = Trainer(model, self.config, device)
+        trainer = Trainer(model, self.config, device, run_dir=self.run_dir)
         
         metrics_file = self.run_dir / 'metrics.csv'
         history = trainer.train(

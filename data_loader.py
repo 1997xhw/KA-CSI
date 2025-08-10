@@ -74,6 +74,8 @@ def load_numpy_data(data_dir):
     if 'label' in detected_files:
         label = np.load(detected_files['label'], allow_pickle=True)
         print(f"加载标签数据: {label.shape}")
+        print(f"标签值范围: {label.min()} - {label.max()}")
+        print(f"唯一标签值: {np.unique(label)}")
     else:
         raise FileNotFoundError(f"未找到标签数据文件")
     
@@ -82,6 +84,33 @@ def load_numpy_data(data_dir):
         raise ValueError(f"数据样本数量不一致: amp={x_amp.shape[0]}, phase={x_phase.shape[0]}, label={label.shape[0]}")
     
     return x_amp, x_phase, label
+
+
+def get_class_names(dataset_type, root_dir):
+    """
+    根据数据集类型返回对应的动作类别名称
+    
+    Args:
+        dataset_type (str): 数据集类型
+        root_dir (str): 数据根目录
+        
+    Returns:
+        list: 动作类别名称列表
+    """
+    # 检查是否为'our'数据集
+    if 'our' in str(root_dir).lower() or 'our' in dataset_type.lower():
+        return ["Stand up / Squat down", "Raise / Lower right hand", "Open / Close arms", "Kick right leg", "Kick left leg", "Unknown"]
+    
+    # 检查是否为'stan'数据集
+    if 'stan' in dataset_type.lower():
+        return ["fall", "run", "lie down", "walk", "sit down", "stand up"]
+    
+    # 检查是否为'wjq'数据集
+    if 'wjq' in dataset_type.lower():
+        return ["wave", "beckon", "push", "pull", "sitdown", "getdown"]
+    
+    # 默认返回wjq的动作列表
+    return ["wave", "beckon", "push", "pull", "sitdown", "getdown"]
 
 
 def get_dataloader(dataset_type, root_dir, batch_size=32, shuffle=True, num_workers=1):
@@ -96,7 +125,7 @@ def get_dataloader(dataset_type, root_dir, batch_size=32, shuffle=True, num_work
         num_workers (int)
 
     返回：
-        train_loader, val_loader
+        train_loader, val_loader, class_names
     """
     print(f"正在加载数据集: {dataset_type}")
     print(f"数据根目录: {root_dir}")
@@ -123,6 +152,20 @@ def get_dataloader(dataset_type, root_dir, batch_size=32, shuffle=True, num_work
     x_amp = torch.tensor(x_amp, dtype=torch.float32)
     x_phase = torch.tensor(x_phase, dtype=torch.float32)
     label = torch.tensor(label, dtype=torch.long)
+    
+    # 特殊处理'our'数据集，只取前90个天线
+    if 'our' in str(root_dir).lower() or 'our' in dataset_type.lower():
+        print("检测到'our'数据集，只取前90个天线")
+        if len(x_amp.shape) == 3 and x_amp.shape[2] > 90:
+            # 数据形状为 [samples, features, antennas]，取前90个天线
+            x_amp = x_amp[:, :, :90]
+            x_phase = x_phase[:, :, :90]
+            print(f"已截取前90个天线数据")
+        elif len(x_amp.shape) == 2 and x_amp.shape[1] > 90:
+            # 数据形状为 [samples, features]，取前90列
+            x_amp = x_amp[:, :90]
+            x_phase = x_phase[:, :90]
+            print(f"已截取前90列数据")
     
     print(f"数据形状:")
     print(f"  幅度: {x_amp.shape}")
@@ -157,7 +200,10 @@ def get_dataloader(dataset_type, root_dir, batch_size=32, shuffle=True, num_work
         num_workers=num_workers
     )
     
-    return train_loader, val_loader
+    # 获取对应的动作类别名称
+    class_names = get_class_names(dataset_type, root_dir)
+    
+    return train_loader, val_loader, class_names
 
 
 def list_available_datasets(root_dir="./data"):
@@ -197,10 +243,11 @@ if __name__ == "__main__":
     
     # 测试加载特定数据集
     if available_datasets:
-        test_dataset = available_datasets[1]
+        test_dataset = available_datasets[0]
         print(f"\n测试加载数据集: {test_dataset}")
         try:
-            train_loader, val_loader = get_dataloader(test_dataset, "./data")
+            train_loader, val_loader, class_names = get_dataloader(test_dataset, "./data")
             print(f"✓ 成功加载数据集: {test_dataset}")
+            print(f"检测到的动作类别: {class_names}")
         except Exception as e:
             print(f"✗ 加载数据集失败: {e}")
